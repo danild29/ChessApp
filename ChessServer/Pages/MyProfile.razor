@@ -1,0 +1,87 @@
+﻿@page "/MyProfile"
+@using ChessServer.Models
+@using DataAccessLibrary.Models
+@using DataAccessLibrary.Data
+
+@inject IPlayerData data
+@inject PlayerModel profile
+
+@if (profile.Rating == -1)
+{
+    <p1>you are not login</p1>
+
+
+    <EditForm Model="@myProfile" OnValidSubmit="@LogIn">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div>
+            <h1>Your Name</h1>
+            <InputText id="Email" @bind-Value="myProfile.Email" />
+            <h1>Your Password</h1>
+            <InputText id="Pasword" @bind-Value="myProfile.Pasword" />
+        </div>
+        <div>
+            <button type="submit" class="btn btn-primary"> Submit</button>
+        </div>
+    </EditForm>
+
+    <div>
+        <p>don't have an account</p>
+        <a href="register"> Register</a>
+    </div>
+
+}
+else
+{
+    <div class="my-5">
+        <h1 class="my-2" >name: @profile.NickName</h1>
+        <h1 class="my-2">email: @profile.Email</h1>
+        <h1 class="my-2">rating: @profile.Rating</h1>
+        <h1 class="my-2">@DisplayPremium</h1>
+        <h1 class="my-2">@DisplayStatus</h1>
+    </div>
+
+    <button @onclick="@LogOut" class="btn btn-danger"> LogOut</button>
+}
+
+
+@code 
+{
+    string DisplayPremium => profile.IsPremium ? "You have premium" : "u need to buy premium asap";
+    string DisplayStatus => profile.Status != null & profile.Status != "" ? "your status: " + @profile.Status : "Change Your status";
+
+    private DisplayPlayerModel myProfile = new();
+
+
+    private async Task LogIn()
+    {
+
+        PlayerModel? prof = await data.AuthorizePlayer(myProfile.Email, myProfile.Pasword);
+
+        if(prof is not null)
+        {
+            profile.Id = prof.Id;
+            profile.NickName = prof.NickName;
+            profile.Email = prof.Email;
+            profile.Pasword = prof.Pasword;
+            profile.Rating = prof.Rating;
+            profile.IsPremium = prof.IsPremium;
+            profile.Status = prof.Status;
+        }
+        else
+        {
+            myProfile = new();
+        }
+    }
+
+
+    private void LogOut()
+    {
+        profile.Email = string.Empty;
+        profile.Pasword = string.Empty;
+        profile.NickName = string.Empty;
+        profile.Rating = -1;
+    }
+
+}

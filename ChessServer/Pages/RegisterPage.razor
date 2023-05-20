@@ -1,0 +1,90 @@
+﻿@page "/register"
+@using ChessServer.Models
+@using DataAccessLibrary.Models
+@using DataAccessLibrary.Data
+
+@inject NavigationManager NavigationManager
+
+@inject IPlayerData data
+@inject PlayerModel profile
+
+<h3>Register</h3>
+
+<div style=@Display class="alert alert-dismissible alert-success">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <strong>Well done!</strong> You successfully created new user. 
+</div>
+
+<EditForm Model="@newPlayer" OnValidSubmit="@InsertPlayer">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+    
+    <div class="my-5">
+
+        <div class="form-group my-3">
+            <p1 class="text-info mt-4">your name(all users will see your name)</p1>
+            <div>
+                <InputText class="form-control" placeholder="Enter Name" id="NickName" @bind-Value="newPlayer.NickName" />
+            </div>
+        </div>
+        <div class="form-group my-3">
+            <p1 class="text-info">your email</p1>
+            <InputText id="Email" class="form-control" placeholder="Enter email" @bind-Value="newPlayer.Email" />
+        </div>
+        <div class="form-group my-3">
+            <p1 class="text-info">your password</p1>
+            <InputText class="form-control" id="Pasword" placeholder="Enter password" @bind-Value="newPlayer.Pasword" />
+        </div>
+
+
+    </div>
+    <div class="text-center">
+        <button type="submit" class="btn btn-lg btn-sx btn-outline-success"> Submit</button>
+    </div>
+</EditForm>
+
+<h1 class="text-danger">@ErrorMessage</h1>
+
+
+@code
+{
+    private string ErrorMessage { get; set; } = string.Empty;
+    private DisplayPlayerModel? newPlayer = new();
+    string Display = "display: none;";
+
+    private async Task InsertPlayer()
+    {
+
+        PlayerModel p = new PlayerModel
+            {
+                NickName = newPlayer.NickName,
+                Email = newPlayer.Email,
+                Pasword = newPlayer.Pasword
+
+            };
+
+
+        ErrorMessage = "checking if already exists...";
+        if((await data.GetPlayer(p.Email)) is null) 
+        {
+            ErrorMessage = "Adding...";
+            await data.InsertPlayer(p);
+            ErrorMessage = string.Empty;
+
+            profile.NickName = p.NickName;
+            profile.Email = p.Email;
+            profile.Pasword = p.Pasword;
+            profile.Rating = 100;
+            Display = "display: block;";
+
+            newPlayer = new();
+            NavigationManager.NavigateTo("MyProfile");
+        }
+        else
+        {
+            ErrorMessage = "player already exists";
+        }
+    }
+
+
+}

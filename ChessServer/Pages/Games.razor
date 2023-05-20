@@ -1,0 +1,92 @@
+﻿@page "/games"
+
+
+
+@using DataAccessLibrary.Data
+@using DataAccessLibrary.Models
+@using ChessServer.Data
+
+@inject IGameData data
+
+<PageTitle>Games</PageTitle>
+
+
+
+<h2>@ErrorMes</h2>
+@if (_games == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <button class="btn btn-success" @onclick="@CreateGame">Create Game</button>
+    <button class="btn btn-danger" @onclick="@Play">Play</button>
+
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>fplayer</th>
+                <th>rating</th>
+                <th>status</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var game in _games)
+            {
+                <tr>
+                    <td>@game.FPlayer</td>
+                    <td>@game.Rating</td>
+                    <td>@game.Status</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+
+@code {
+    string ErrorMes = string.Empty;
+    public List<GameModel>? _games;
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        _games = (await data.GetGames()).ToList();
+
+    }
+
+    Random random = new();
+
+
+    public async Task Play()
+    {
+        GameModel game = (await data.GetGames()).ToList().First();
+        data.DeleteGame(game.Id);
+
+    }
+
+    public async Task CreateGame()
+    {
+        GameModel g = new();
+        g.FPlayer = 1;
+        g.Rating = random.Next();
+        g.Status = "w Sp";
+
+
+        g.Board = "....        ....";
+
+        _games.Add(g);
+        try
+        {
+            data.InsertGame(g);
+        }
+        catch(Exception ex)
+        {
+            ErrorMes = ex.Message;
+        }
+    }
+
+
+
+}

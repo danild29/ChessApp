@@ -1,0 +1,24 @@
+﻿@page "/draganddrop"
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+
+<h3>DragAndDrop</h3>
+
+
+<div draggable="true">
+    <div class="html5"> HTML5</div>
+</div>
+
+
+<div class="main" width="500px" height="500px">
+    <div class="draggable">Draggable Element</div>
+    <div class="dropzone">Drop zone</div>
+</div>
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await JS.InvokeVoidAsync("dragAndDrop", ".draggable");
+        await JS.InvokeVoidAsync("dropZone", ".dropzone");
+    }
+}

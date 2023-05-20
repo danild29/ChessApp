@@ -1,0 +1,27 @@
+﻿@using ChessServer.Data;
+@typeparam T
+@inject DragAndDropService dadService
+
+<div ondragover="event.preventDefault()" ondrop="@OnDrop">
+    @ChildContent
+</div>
+
+
+@code {
+    [Parameter]
+    public RenderFragment ChildContent { get; set; }
+
+    [Parameter]
+    public string Zone { get; set; }
+
+    [Parameter]
+    public Action<T> Drop { get; set; }
+
+    private void OnDrop()
+    {
+        if(Drop != null && dadService.Accepts(Zone))
+        {
+            Drop((T)dadService.Data);
+        }
+    }
+}

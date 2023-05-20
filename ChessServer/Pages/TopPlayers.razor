@@ -1,0 +1,51 @@
+﻿@page "/Data/Players"
+
+
+
+@using DataAccessLibrary.Data
+@using DataAccessLibrary.Models
+@inject IPlayerData data
+
+<PageTitle>Top Players</PageTitle>
+
+<h1>top players</h1>
+
+
+@if (players == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>nick</th>
+                <th>login</th>
+                <th>password</th>
+                <th>rating</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var player in players)
+            {
+                <tr>
+                    <td>@player.NickName</td>
+                    <td>@player.Email</td>
+                    <td>@player.Pasword</td>
+                    <td>@player.Rating.ToString()</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<PlayerModel> players;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var p = await data.GetPlayers();
+        players = p.ToList();
+    }
+}

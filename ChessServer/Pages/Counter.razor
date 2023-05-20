@@ -1,0 +1,28 @@
+﻿@page "/counter"
+@using DataAccessLibrary.Models;
+
+<PageTitle>Counter</PageTitle>
+@inject PlayerModel player
+
+<h1>Counter</h1>
+
+<p role="status">Current count: @currentCount</p>
+
+<button class="btn btn-primary" @onclick="Save">Click me</button>
+<input @bind="newStatus" />
+
+@code {
+    private int currentCount = 0;
+
+    private string newStatus = "name";
+
+    private void IncrementCount()
+    {
+        currentCount++;
+    }
+
+    private void Save()
+    {
+        player.Status = newStatus;
+    }
+}

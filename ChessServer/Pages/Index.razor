@@ -1,0 +1,125 @@
+﻿@page "/"
+
+@using ChessServer.Data;
+@using DataAccessLibrary.Models;
+@using Microsoft.AspNetCore.SignalR.Client
+
+@inject NavigationManager NavManager
+@inject PlayerModel player
+@implements IAsyncDisposable
+
+<ul>
+    @foreach (string us in _users)
+    {
+        <li>@us</li>
+    }
+</ul>
+<br />
+<br />
+<br />
+<br />
+<br />
+
+<ul>
+    @foreach (string message in messages)
+    {
+        <li>@message</li>
+    }
+</ul>
+
+
+
+<h2 class="">@conId</h2>
+<div class="form-group">
+    <label>
+        User: <input @bind="userInput" />
+    </label>
+</div>
+<div class="form-group">
+    <label>
+        Message: <input @bind="messageInput" />
+    </label>
+</div>
+<button @onclick="Send" disabled="@(IsConnected == false)">Send</button>
+
+<hr />
+
+
+
+@code {
+    private HubConnection? hubConnection;
+
+
+    private List<string> _users = new();
+
+    private List<string> messages = new();
+    private string? userInput;
+    private string? messageInput;
+
+
+    private string? conId;
+
+
+    public bool IsConnected => hubConnection?.State == HubConnectionState.Connected;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+
+
+        if(player.Rating == -1) return;
+        string id = player.Status ?? "anon";
+        DebugClass.Strings.Add("added id = " + id);
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavManager.ToAbsoluteUri($"/gamehub/Id={id}"))
+            .WithAutomaticReconnect()
+            .Build();
+
+   
+
+        //incoming signals
+        hubConnection.On<string, string>("SendMessageAsync", (user, message) =>
+        {
+            string formattedMessage = $"{user}: {message}";
+            messages.Add(formattedMessage);
+            InvokeAsync(StateHasChanged);
+        });
+
+        hubConnection.On<IEnumerable<string>>("UpdateUsersAsync", (users) =>
+        {
+            _users.Clear();
+            foreach(var u in users)
+            {
+                _users.Add(u);
+            }
+            InvokeAsync(StateHasChanged);
+        });
+
+
+
+        await hubConnection.StartAsync();
+        conId = "MyConId:   " + hubConnection.ConnectionId;
+    }
+
+
+    //outcoming signals
+    private async Task Send()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.SendAsync("SendMessageAsync", userInput, messageInput);
+        }
+    }
+
+
+
+
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+}
