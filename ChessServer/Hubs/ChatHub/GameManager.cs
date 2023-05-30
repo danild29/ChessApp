@@ -55,6 +55,7 @@ public class GameManager
             foreach (var con in user.Connections)
             {
                 if (con.ConnectionId == connectionId) return user;
+                
             }
         }
         return null;

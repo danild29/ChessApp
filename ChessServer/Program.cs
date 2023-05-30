@@ -6,8 +6,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.ResponseCompression;
 using ChessServer.Hubs;
-
-
+using ChessServer.Hubs.GamePlay;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,9 +23,11 @@ builder.Services.AddSingleton<DragAndDropService>();
 
 //hubs
 builder.Services.AddSingleton<GameManager>();
+builder.Services.AddSingleton<PlayManager>();
 
 
 builder.Services.AddScoped<PlayerModel>();
+builder.Services.AddTransient<ChessBoard>();
 
 //builder.Services.AddResponseCompression(opts =>
     
@@ -56,6 +57,7 @@ app.UseRouting();
 
 app.MapBlazorHub();
 app.MapHub<GameHub>("/gamehub/Id={Id}");
+app.MapHub<PlayHub>("/playhub");
 app.MapFallbackToPage("/_Host");
 
 app.Run();

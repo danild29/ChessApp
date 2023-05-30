@@ -14,8 +14,7 @@ public class Game
     public DateTime CreatedTime { get; set; }
     public int Rating { get; set; }
 
-    (int, string) prev;
- 
+
     public void InitGame(GameModel game)
     {
         Id = game.Id;

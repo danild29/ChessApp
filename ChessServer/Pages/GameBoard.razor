@@ -1,0 +1,327 @@
+﻿@page "/gameboard"
+@using ChessServer.Data;
+@using ChessServer.Data.Extensions;
+@using ChessServer.Hubs.GamePlay;
+@using Microsoft.AspNetCore.SignalR.Client;
+@using Newtonsoft.Json;
+
+@inject NavigationManager NavManager
+@implements IAsyncDisposable
+
+
+@if(!IsReady)
+{
+    <button @onclick="@Start">Play</button>
+}
+else if(gameInforamation == null)
+{
+    <h2>searching for enemy</h2>
+}
+else
+{
+<button @onclick="@Exit">exit</button>
+
+
+<h3>@Message</h3>
+<h4>@ShowTimer</h4>
+<div class="row">
+<div >
+    <table class="chess-board">
+        <tbody>
+            <tr>
+                @foreach(var s in " abcdefgh")
+                {
+                    <th>@s</th>
+                }
+            </tr>
+            @for (int i = 0; i < _board.NumRows; i++)
+            {
+                <tr>
+                    <th>@(i + 1)</th>
+                    @for (int j = 0; j < _board.NumRows; j++)
+                    {
+                        int index = i * 8 + j;
+
+                        if(index == ClickedIndex || AvaliableMoves[i, j])
+                        {
+                            <td class="clicked" @onclick="() => TrClickedAtIndex(index)">@_board.Board[i, j]</td>
+                        }
+                        else if((i+j) % 2 == 1)
+                        {
+                            <td class="dark" @onclick="() => TrClickedAtIndex(index)">@_board.Board[i, j]</td>
+                        }
+                        else
+                        {
+                            <td class="light" @onclick="() => TrClickedAtIndex(index)">@_board.Board[i, j]</td>
+                        }
+                    }
+                </tr>
+            }
+        
+        </tbody>
+    </table>
+    <h4>@ShowTimerEnemy</h4>
+
+</div>
+
+<div>
+    <ul>
+        @foreach (string info in PrevMoves)
+        {
+            <li>@info</li>
+        }
+    </ul>
+</div>
+</div>
+
+
+}
+
+
+
+@code {
+
+    private HubConnection? hubConnection;
+    public bool IsConnected => hubConnection?.State == HubConnectionState.Connected;
+    private string ConId = "";
+    private string EnemyId = "";
+
+    Timer? timer = null;
+
+    private string ShowTimerEnemy => $"Enemy is {EnemyId} : {String.Format("{0:F2}", (Side == Sides.White ? TimeLeftBlack : TimeLeftWhite))}";
+    private string ShowTimer => $"I am {ConId} : {String.Format("{0:F2}", (Side == Sides.White ? TimeLeftWhite : TimeLeftBlack))}";
+
+
+    private double TimeLeftWhite { get; set; }
+    private double TimeLeftBlack { get; set; }
+
+    private int BoardId;
+    private ChessBoard _board;
+    private bool[,] AvaliableMoves;
+
+    private Sides Side;
+    private Sides CurrentSideMove = Sides.White;
+
+    private bool IsOver = false;
+    private bool IsReady = false;
+
+
+
+    private int ClickedIndex = -1;
+    private string Message = string.Empty;
+    private List<string> PrevMoves = new();
+
+    private GameInfo? gameInforamation;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _board = new();
+        AvaliableMoves = new bool[_board.NumRows, _board.NumCols];
+    }
+
+    private async Task Exit()
+    {
+        ClickedIndex = -1;
+        Message = string.Empty;
+        PrevMoves.Clear();
+        gameInforamation = null;
+        IsReady = false;
+        StopGame();
+
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task Start()
+    {
+        _board = new();
+        AvaliableMoves = new bool[_board.NumRows, _board.NumCols];
+        IsReady = true;
+
+
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavManager.ToAbsoluteUri($"/playhub"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        hubConnection.On<string, Sides, string>(nameof(IPlayHub.StartGame), (enemyId, side, gameInfo) =>
+        {
+            GameInfo? game = JsonConvert.DeserializeObject<GameInfo>(gameInfo);
+            if (game == null) return;
+            IsOver = false; 
+
+
+            gameInforamation = game;
+            BoardId = game.Id;
+            EnemyId = enemyId;
+            Side = side;
+
+
+            TimeLeftWhite = game.TimeLeftWhite;
+            TimeLeftBlack = game.TimeLeftBlack;
+
+            InvokeAsync(StateHasChanged);
+        });
+
+        hubConnection.On<string>(nameof(IPlayHub.SendMessageToPlayer), (mes) =>
+        {
+            MessageInfo? message = JsonConvert.DeserializeObject<MessageInfo>(mes);
+            if (message == null) return;
+
+            Message = message.Message;
+            if (message.IsStopGame) StopGame();
+            InvokeAsync(StateHasChanged);
+        });
+
+        hubConnection.On<string>(nameof(IPlayHub.WasMove), (data) =>
+        {
+            GameInfo? game = JsonConvert.DeserializeObject<GameInfo>(data);
+            if (game == null) return;
+
+            DebugClass.Strings.Add(data);
+
+            _board = game.Board;
+            PrevMoves = game.Moves;
+            CurrentSideMove = game.CurrentMove;
+            gameInforamation = game;
+            TimeLeftWhite = game.TimeLeftWhite;
+            TimeLeftBlack = game.TimeLeftBlack;
+            InvokeAsync(StateHasChanged);
+        });
+
+
+        await hubConnection.StartAsync();
+        
+        ConId = hubConnection.ConnectionId ! ;
+
+        timer = new Timer(ChageTimeLeft, null, 0, 100);
+        await InvokeAsync(StateHasChanged);
+
+    }
+
+
+
+    public async void TrClickedAtIndex(int index)
+    {
+
+
+        if (index == ClickedIndex || Side != CurrentSideMove || IsOver) return;
+
+        if (ClickedIndex != -1 && AvaliableMoves[index / 8, index % 8])
+        {
+
+            Move move = new();
+            {
+                move.Fromy = ClickedIndex / 8;
+                move.Fromx = ClickedIndex % 8;
+                move.Toy = index / 8;
+                move.Tox = index % 8;
+            };
+            ClickedIndex = -1;
+            ClearMoves();
+
+            _board.MakeMove(move);
+            PrevMoves.Add(move.ToString());
+            CurrentSideMove = CurrentSideMove.GetOpositeSide();
+
+            string moveJsonString = JsonConvert.SerializeObject(move);
+            await MakeMove(moveJsonString);
+
+            return;
+        }
+
+        if(_board.IsEmpty(index))
+        {
+            ClickedIndex = -1;
+            ClearMoves();
+            return;
+        }
+
+
+        ClickedIndex = index;
+        ClearMoves();
+        AvaliableMoves = ValidateBoard.FindGoodCells(_board, index, Side);
+
+    }
+
+
+    private async Task MakeMove(string move)
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.SendAsync(nameof(PlayHub.SendMove), BoardId, move);
+        }
+    }
+
+    private async Task MakeWinner()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.SendAsync(nameof(PlayHub.DefineWinner), BoardId);
+        }
+    }
+
+
+
+    private void ClearMoves()
+    {
+        for (int i = 0; i < _board.NumRows; i++)
+            for (int j = 0; j < _board.NumRows; j++) AvaliableMoves[i, j] = false;
+    }
+
+    private void ChageTimeLeft(object? state)
+    {
+
+        if (gameInforamation == null) return;
+        var diff = (DateTime.Now - gameInforamation.LastMoveTime).TotalSeconds;
+
+        if (CurrentSideMove == Sides.White)
+        {
+            TimeLeftWhite -= diff;
+            TimeLeftWhite = TimeLeftWhite < 0 ? 0 : TimeLeftWhite;
+
+        }
+        if (CurrentSideMove == Sides.Black)
+        {
+            TimeLeftBlack -= diff;
+            TimeLeftBlack = TimeLeftBlack < 0 ? 0 : TimeLeftBlack;
+        }
+
+        gameInforamation.LastMoveTime = DateTime.Now;
+        InvokeAsync(StateHasChanged);
+
+        if (!IsOver && (TimeLeftBlack <= 0 || TimeLeftWhite <= 0))
+        {
+            MakeWinner();
+            StopGame();
+        }
+
+    }
+
+
+    private void StopGame()
+    {
+        IsOver = true;
+        if (timer is not null)
+        {
+            timer.Dispose();
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (timer is not null)
+        {
+            timer.Dispose();
+        }
+
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+}
+
